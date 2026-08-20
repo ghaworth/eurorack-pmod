@@ -22,8 +22,12 @@ always_ff @(posedge clk_in) begin
 end
 
 // put the divided clock onto the global clock network via BUFG
-// (ports are .I and .O)
-
+`ifndef VERILATOR_LINT_ONLY
+BUFG clk_gbuf_I (
+    .I(clkdiv_256),
+    .O(clk_256fs)
+);
+`endif
 
 // placeholder only, not synchronised into clk_256fs: treat as its own step
 assign rst_out = rst_in;
