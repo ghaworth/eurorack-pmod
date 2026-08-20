@@ -165,12 +165,27 @@ OFS1P3DX ofs_sdin1  (.D(pmod_sdin1_int), .SP(1'b1), .SCLK(clk_256fs), .CD(1'b0),
 IFS1P3DX ifs_sdout1 (.D(PMOD_SDOUT1),    .SP(1'b1), .SCLK(clk_256fs), .CD(1'b0), .Q(pmod_sdout1_int));
 `endif
 `else
-// For iCE40 this is not necessary.
+// Generic tristate idiom: confirmed via synth_xilinx that Yosys infers
+// a real IOBUF from this for Xilinx too, so it stays shared rather than
+// forking a third copy.
 assign PMOD_I2C_SCL = i2c_scl_oe ? 1'b0 : 1'bz;
 assign PMOD_I2C_SDA = i2c_sda_oe ? 1'b0 : 1'bz;
 assign i2c_scl_i = PMOD_I2C_SCL;
 assign i2c_sda_i = PMOD_I2C_SDA;
 `ifndef VERILATOR_LINT_ONLY
+`ifdef XILINX
+// Xilinx IOB regs for I2S signals: SDR-via-DDR trick, D1/D2 tied
+// together, gets the register placed in the IOB same as OFS1P3DX/SB_IO
+// do on the other two vendors.
+ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) oddr_bick (
+    .Q(PMOD_BICK), .C(clk_256fs), .CE(1'b1), .D1(pmod_bick_int), .D2(pmod_bick_int), .R(1'b0), .S(1'b0));
+ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) oddr_lrck (
+    .Q(PMOD_LRCK), .C(clk_256fs), .CE(1'b1), .D1(pmod_lrck_int), .D2(pmod_lrck_int), .R(1'b0), .S(1'b0));
+ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) oddr_sdin1 (
+    .Q(PMOD_SDIN1), .C(clk_256fs), .CE(1'b1), .D1(pmod_sdin1_int), .D2(pmod_sdin1_int), .R(1'b0), .S(1'b0));
+IDDR #(.DDR_CLK_EDGE("SAME_EDGE")) iddr_sdout1 (
+    .Q1(pmod_sdout1_int), .Q2(), .C(clk_256fs), .CE(1'b1), .D(PMOD_SDOUT1), .R(1'b0), .S(1'b0));
+`else
 // ICE40 IO regs for I2S signals.
 SB_IO #(.PIN_TYPE(6'b110101)) sb_io_bick (
     .PACKAGE_PIN(PMOD_BICK), .OUTPUT_CLK(clk_256fs), .D_OUT_0(pmod_bick_int), .OUTPUT_ENABLE(1'b1));
@@ -180,6 +195,7 @@ SB_IO #(.PIN_TYPE(6'b110101)) sb_io_sdin1 (
     .PACKAGE_PIN(PMOD_SDIN1), .OUTPUT_CLK(clk_256fs), .D_OUT_0(pmod_sdin1_int), .OUTPUT_ENABLE(1'b1));
 SB_IO #(.PIN_TYPE(6'b000000)) sb_io_sdout1 (
     .PACKAGE_PIN(PMOD_SDOUT1), .INPUT_CLK(clk_256fs), .D_IN_0(pmod_sdout1_int));
+`endif
 `endif
 `endif
 
