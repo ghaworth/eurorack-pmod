@@ -175,18 +175,26 @@ IFS1P3DX ifs_sdout1 (.D(PMOD_SDOUT1),    .SP(1'b1), .SCLK(clk_256fs), .CD(1'b0),
 // flagged "limited support for tri-state logic" codepath entirely.
 IOBUF iobuf_scl (.O(i2c_scl_i), .IO(PMOD_I2C_SCL), .I(1'b0), .T(~i2c_scl_oe));
 IOBUF iobuf_sda (.O(i2c_sda_i), .IO(PMOD_I2C_SDA), .I(1'b0), .T(~i2c_sda_oe));
-// Xilinx IOB regs for I2S signals: SDR-via-DDR trick, D1/D2 tied
-// together, gets the register placed in the IOB same as OFS1P3DX/SB_IO
-// do on the other two vendors.
-ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) oddr_bick (
-    .Q(PMOD_BICK), .C(clk_256fs), .CE(1'b1), .D1(pmod_bick_int), .D2(pmod_bick_int), .R(1'b0), .S(1'b0));
-ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) oddr_lrck (
-    .Q(PMOD_LRCK), .C(clk_256fs), .CE(1'b1), .D1(pmod_lrck_int), .D2(pmod_lrck_int), .R(1'b0), .S(1'b0));
-ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) oddr_sdin1 (
-    .Q(PMOD_SDIN1), .C(clk_256fs), .CE(1'b1), .D1(pmod_sdin1_int), .D2(pmod_sdin1_int), .R(1'b0), .S(1'b0));
-IDDR #(.DDR_CLK_EDGE("SAME_EDGE")) iddr_sdout1 (
-    .Q1(pmod_sdout1_int), .Q2(), .C(clk_256fs), .CE(1'b1), .D(PMOD_SDOUT1), .R(1'b0), .S(1'b0));
 `endif
+// Plain fabric flip-flops for the I2S signals, NOT ODDR/IDDR.
+// ODDR/IDDR were tried first, to place the registers in the IOB the way
+// OFS1P3DX and SB_IO do on the other vendors. On hardware, 22 Aug 2026,
+// SDOUT1 read as constant zero while a scope showed real ADC data on the
+// wire, so openXC7's ILOGIC/OLOGIC DDR configuration is not trustworthy
+// here. IOB placement buys nothing at these clock rates anyway: one
+// clk_256fs period is 160 ns.
+logic pmod_bick_reg;
+logic pmod_lrck_reg;
+logic pmod_sdin1_reg;
+always_ff @(posedge clk_256fs) begin
+    pmod_bick_reg   <= pmod_bick_int;
+    pmod_lrck_reg   <= pmod_lrck_int;
+    pmod_sdin1_reg  <= pmod_sdin1_int;
+    pmod_sdout1_int <= PMOD_SDOUT1;
+end
+assign PMOD_BICK  = pmod_bick_reg;
+assign PMOD_LRCK  = pmod_lrck_reg;
+assign PMOD_SDIN1 = pmod_sdin1_reg;
 `else
 // Generic tristate idiom, ICE40 only now, unchanged from what already worked.
 assign PMOD_I2C_SCL = i2c_scl_oe ? 1'b0 : 1'bz;
