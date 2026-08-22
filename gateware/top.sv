@@ -164,16 +164,17 @@ OFS1P3DX ofs_lrck   (.D(pmod_lrck_int),  .SP(1'b1), .SCLK(clk_256fs), .CD(1'b0),
 OFS1P3DX ofs_sdin1  (.D(pmod_sdin1_int), .SP(1'b1), .SCLK(clk_256fs), .CD(1'b0), .Q(PMOD_SDIN1));
 IFS1P3DX ifs_sdout1 (.D(PMOD_SDOUT1),    .SP(1'b1), .SCLK(clk_256fs), .CD(1'b0), .Q(pmod_sdout1_int));
 `endif
+
 `else
-// Generic tristate idiom: confirmed via synth_xilinx that Yosys infers
-// a real IOBUF from this for Xilinx too, so it stays shared rather than
-// forking a third copy.
-assign PMOD_I2C_SCL = i2c_scl_oe ? 1'b0 : 1'bz;
-assign PMOD_I2C_SDA = i2c_sda_oe ? 1'b0 : 1'bz;
-assign i2c_scl_i = PMOD_I2C_SCL;
-assign i2c_sda_i = PMOD_I2C_SDA;
-`ifndef VERILATOR_LINT_ONLY
 `ifdef XILINX
+`ifndef VERILATOR_LINT_ONLY
+// Xilinx: explicit IOBUF rather than inferred from the generic 1'bz
+// idiom. Confirmed on real hardware, 21 Aug 2026: the inferred path
+// synthesises to a real IOBUF with no error, but SCL never actually
+// toggled on silicon. Explicit instantiation avoids Yosys's own
+// flagged "limited support for tri-state logic" codepath entirely.
+IOBUF iobuf_scl (.O(i2c_scl_i), .IO(PMOD_I2C_SCL), .I(1'b0), .T(~i2c_scl_oe));
+IOBUF iobuf_sda (.O(i2c_sda_i), .IO(PMOD_I2C_SDA), .I(1'b0), .T(~i2c_sda_oe));
 // Xilinx IOB regs for I2S signals: SDR-via-DDR trick, D1/D2 tied
 // together, gets the register placed in the IOB same as OFS1P3DX/SB_IO
 // do on the other two vendors.
@@ -185,7 +186,14 @@ ODDR #(.DDR_CLK_EDGE("SAME_EDGE")) oddr_sdin1 (
     .Q(PMOD_SDIN1), .C(clk_256fs), .CE(1'b1), .D1(pmod_sdin1_int), .D2(pmod_sdin1_int), .R(1'b0), .S(1'b0));
 IDDR #(.DDR_CLK_EDGE("SAME_EDGE")) iddr_sdout1 (
     .Q1(pmod_sdout1_int), .Q2(), .C(clk_256fs), .CE(1'b1), .D(PMOD_SDOUT1), .R(1'b0), .S(1'b0));
+`endif
 `else
+// Generic tristate idiom, ICE40 only now, unchanged from what already worked.
+assign PMOD_I2C_SCL = i2c_scl_oe ? 1'b0 : 1'bz;
+assign PMOD_I2C_SDA = i2c_sda_oe ? 1'b0 : 1'bz;
+assign i2c_scl_i = PMOD_I2C_SCL;
+assign i2c_sda_i = PMOD_I2C_SDA;
+`ifndef VERILATOR_LINT_ONLY
 // ICE40 IO regs for I2S signals.
 SB_IO #(.PIN_TYPE(6'b110101)) sb_io_bick (
     .PACKAGE_PIN(PMOD_BICK), .OUTPUT_CLK(clk_256fs), .D_OUT_0(pmod_bick_int), .OUTPUT_ENABLE(1'b1));
