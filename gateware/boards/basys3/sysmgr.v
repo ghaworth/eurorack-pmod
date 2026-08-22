@@ -6,7 +6,7 @@ module sysmgr (
     output wire rst_out
 );
 
-// divide clk_in by 8 to get ~12.5 MHz
+// divide clk_in by 16 to get ~6.25 MHz
 // (same bit-slicing idea as clkdiv in ak4619.sv, just off clk_in this time)
 logic [2:0] clkdiv;
 logic clkdiv_256;
