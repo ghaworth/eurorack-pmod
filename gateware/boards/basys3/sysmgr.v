@@ -29,7 +29,15 @@ BUFG clk_gbuf_I (
 );
 `endif
 
-// placeholder only, not synchronised into clk_256fs: treat as its own step
-assign rst_out = rst_in;
+logic [7:0] rst_cnt = 0;
+assign rst_out = ~rst_cnt[7];
+
+always @(posedge clk_256fs) begin
+    if (rst_in)
+        rst_cnt <= 8'h0;
+    else if (~rst_cnt[7])
+        rst_cnt <= rst_cnt + 1;
+
+end
 
 endmodule
